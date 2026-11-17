@@ -2,364 +2,219 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TikTok Live Clicker</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0a0a0f;
-      --surface: #13131a;
-      --border: #22222e;
+      --bg: #0e0e10;
+      --surface: #161619;
+      --surface-2: #1d1d21;
+      --line: #26262b;
+      --text: #ececf0;
+      --muted: #7d7d88;
       --accent: #fe2c55;
-      --accent-dim: #fe2c5520;
-      --accent-glow: #fe2c5540;
-      --green: #25f4ee;
-      --green-dim: #25f4ee20;
-      --text: #f0f0f5;
-      --muted: #888899;
-      --font-display: 'Syne', sans-serif;
-      --font-mono: 'Space Mono', monospace;
+      --accent-soft: rgba(254, 44, 85, 0.14);
+      --ok: #4ade80;
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
     }
 
     body {
-      width: 280px;
+      width: 300px;
       background: var(--bg);
       color: var(--text);
-      font-family: var(--font-mono);
-      overflow: hidden;
+      font-family: var(--font);
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
       user-select: none;
     }
 
-    /* Animated scanline bg */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(255,255,255,0.012) 2px,
-        rgba(255,255,255,0.012) 4px
-      );
-      pointer-events: none;
-      z-index: 0;
-    }
+    .app { padding: 18px; display: flex; flex-direction: column; gap: 18px; }
 
-    .container {
-      position: relative;
-      z-index: 1;
-      padding: 20px;
+    /* Status */
+    .status {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--muted); font-size: 12px;
     }
-
-    /* Header */
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .logo {
-      width: 32px;
-      height: 32px;
-      background: var(--accent);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-      box-shadow: 0 0 16px var(--accent-glow);
-    }
-
-    .title-block h1 {
-      font-family: var(--font-display);
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      color: var(--text);
-      line-height: 1;
-    }
-
-    .title-block span {
-      font-size: 9px;
-      color: var(--muted);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    /* Status bar */
-    .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 16px;
-      font-size: 10px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%;
       background: var(--muted);
-      flex-shrink: 0;
-      transition: background 0.3s, box-shadow 0.3s;
+      transition: background 0.4s var(--ease), box-shadow 0.4s var(--ease);
+    }
+    .dot.active { background: var(--ok); box-shadow: 0 0 0 0 rgba(74,222,128,.5); animation: ping 1.8s infinite; }
+    .dot.error { background: var(--accent); }
+    .dot.done { background: var(--ok); }
+    @keyframes ping {
+      0% { box-shadow: 0 0 0 0 rgba(74,222,128,.45); }
+      70%, 100% { box-shadow: 0 0 0 7px rgba(74,222,128,0); }
+    }
+    #status-text { transition: opacity .2s var(--ease), transform .2s var(--ease); }
+    #status-text.swap { opacity: 0; transform: translateY(2px); }
+    .round {
+      margin-left: auto; padding: 2px 8px; border-radius: 99px;
+      background: var(--surface-2); color: var(--text); font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0; transform: scale(.9);
+      transition: opacity .3s var(--ease), transform .3s var(--ease);
+    }
+    .round.show { opacity: 1; transform: scale(1); }
+
+    .warning {
+      display: grid; grid-template-rows: 0fr;
+      transition: grid-template-rows .35s var(--ease);
+    }
+    .warning > div {
+      overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.5;
+    }
+    .warning.show { grid-template-rows: 1fr; }
+    .warning code { color: var(--text); }
+
+    /* Count */
+    .count-wrap { display: flex; flex-direction: column; gap: 12px; }
+    .count-row { display: flex; align-items: baseline; gap: 8px; }
+    #count {
+      font-size: 44px; font-weight: 600; letter-spacing: -0.03em; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .of { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+    .track { height: 3px; background: var(--line); border-radius: 3px; overflow: hidden; }
+    .fill {
+      height: 100%; width: 0%; background: var(--accent); border-radius: 3px;
+      transition: width .35s var(--ease);
     }
 
-    .status-dot.active {
-      background: var(--green);
-      box-shadow: 0 0 8px var(--green);
-      animation: pulse 1.5s infinite;
+    /* Settings */
+    .group { display: flex; flex-direction: column; gap: 8px; }
+    .label { color: var(--muted); font-size: 12px; }
+
+    .stepper {
+      display: flex; align-items: stretch;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+      transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
     }
-
-    .status-dot.error {
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
+    .stepper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .stepper button {
+      width: 38px; background: none; border: 0; color: var(--muted);
+      font-size: 16px; cursor: pointer; border-radius: 9px;
+      transition: color .2s, background .2s, transform .15s var(--ease);
     }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+    .stepper button:hover { color: var(--text); background: var(--surface-2); }
+    .stepper button:active { transform: scale(.92); }
+    #target {
+      flex: 1; min-width: 0; text-align: center; background: none; border: 0; outline: 0;
+      color: var(--text); font: inherit; font-size: 14px; font-weight: 500; padding: 10px 0;
+      font-variant-numeric: tabular-nums; user-select: text; -moz-appearance: textfield;
     }
+    #target::-webkit-outer-spin-button, #target::-webkit-inner-spin-button { -webkit-appearance: none; }
 
-    #status-text {
-      color: var(--muted);
-      font-size: 10px;
+    .chips { display: flex; gap: 6px; }
+    .chip {
+      flex: 1; padding: 6px 0; background: none; color: var(--muted);
+      border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 12px;
+      cursor: pointer; font-variant-numeric: tabular-nums;
+      transition: color .2s, border-color .2s, background .25s var(--ease), transform .15s var(--ease);
     }
+    .chip:hover { color: var(--text); border-color: #3a3a41; }
+    .chip:active { transform: scale(.95); }
+    .chip.on { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
 
-    #status-text.active { color: var(--green); }
-    #status-text.error { color: var(--accent); }
-
-    /* URL warning */
-    .url-warning {
-      display: none;
-      padding: 10px 12px;
-      background: rgba(254, 44, 85, 0.08);
-      border: 1px solid rgba(254, 44, 85, 0.3);
-      border-radius: 8px;
-      margin-bottom: 16px;
-      font-size: 10px;
-      color: var(--accent);
-      line-height: 1.6;
-      text-align: center;
+    .loop {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 12px; background: var(--surface); border: 1px solid var(--line);
+      border-radius: 10px; cursor: pointer;
+      transition: border-color .25s var(--ease);
     }
-
-    .url-warning.show { display: block; }
-
-    /* Progress section */
-    .progress-section {
-      margin-bottom: 16px;
+    .loop:hover { border-color: #3a3a41; }
+    .loop-title { font-size: 13px; }
+    .loop-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .switch {
+      width: 36px; height: 20px; border-radius: 10px; background: var(--line);
+      position: relative; flex-shrink: 0; border: 0;
+      transition: background .3s var(--ease);
     }
-
-    .progress-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 10px;
-      color: var(--muted);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    .switch::after {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+      border-radius: 50%; background: #fff;
+      transition: transform .35s cubic-bezier(.34,1.56,.64,1);
     }
+    .switch[aria-checked="true"] { background: var(--accent); }
+    .switch[aria-checked="true"]::after { transform: translateX(16px); }
 
-    #count-label {
-      color: var(--text);
-      font-weight: 700;
+    /* Main button */
+    #main-btn {
+      position: relative; width: 100%; padding: 13px; border-radius: 12px;
+      border: 1px solid var(--accent); background: var(--accent); color: #fff;
+      font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; overflow: hidden;
+      transition: background .3s var(--ease), border-color .3s var(--ease), color .3s var(--ease),
+                  transform .15s var(--ease), opacity .3s var(--ease), box-shadow .3s var(--ease);
+      box-shadow: 0 6px 20px -8px rgba(254,44,85,.6);
     }
+    #main-btn:hover:not(:disabled) { transform: translateY(-1px); }
+    #main-btn:active:not(:disabled) { transform: scale(.98); }
+    #main-btn.running { background: transparent; border-color: var(--line); color: var(--text); box-shadow: none; }
+    #main-btn.running:hover { border-color: #3a3a41; }
+    #main-btn:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; }
+    #main-btn span { display: inline-block; transition: opacity .2s var(--ease), transform .2s var(--ease); }
+    #main-btn span.swap { opacity: 0; transform: translateY(4px); }
 
-    .progress-track {
-      height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
+    button:focus-visible, .chip:focus-visible, .loop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--accent), var(--green));
-      border-radius: 2px;
-      transition: width 0.4s ease;
-    }
-
-    /* Toggle button */
-    .toggle-wrap {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      margin-bottom: 14px;
-    }
-
-    .toggle-wrap:hover:not(.disabled) {
-      border-color: var(--accent);
-      background: rgba(254, 44, 85, 0.04);
-    }
-
-    .toggle-wrap.disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-
-    .toggle-label {
-      font-family: var(--font-display);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-    }
-
-    /* Toggle switch */
-    .toggle-switch {
-      width: 44px;
-      height: 24px;
-      background: var(--border);
-      border-radius: 12px;
-      position: relative;
-      transition: background 0.3s;
-      flex-shrink: 0;
-    }
-
-    .toggle-switch.on {
-      background: var(--accent);
-      box-shadow: 0 0 12px var(--accent-glow);
-    }
-
-    .toggle-knob {
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 18px;
-      height: 18px;
-      background: #fff;
-      border-radius: 50%;
-      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-    }
-
-    .toggle-switch.on .toggle-knob {
-      transform: translateX(20px);
-    }
-
-    /* Stats row */
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .stat-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      text-align: center;
-    }
-
-    .stat-val {
-      font-family: var(--font-display);
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--text);
-      line-height: 1;
-      margin-bottom: 3px;
-    }
-
-    .stat-val.highlight { color: var(--accent); }
-
-    .stat-label {
-      font-size: 9px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-    }
-
-    /* Footer */
-    .footer {
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-      font-size: 9px;
-      color: var(--muted);
-      text-align: center;
-      letter-spacing: 0.5px;
-    }
-
-    .footer a {
-      color: var(--accent);
-      text-decoration: none;
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
+  <main class="app">
 
-    <div class="header">
-      <div class="logo">🎵</div>
-      <div class="title-block">
-        <h1>Live Clicker</h1>
-        <span>TikTok Auto Bot</span>
+    <div>
+      <div class="status">
+        <span class="dot" id="dot"></span>
+        <span id="status-text">Checking page…</span>
+        <span class="round" id="round">Round 1</span>
+      </div>
+      <div class="warning" id="warning">
+        <div><p style="padding-top:10px">Open a live stream first: <code>tiktok.com/@username/live</code></p></div>
       </div>
     </div>
 
-    <div class="status-bar">
-      <div class="status-dot" id="status-dot"></div>
-      <span id="status-text">Checking page…</span>
-    </div>
-
-    <div class="url-warning" id="url-warning">
-      ⚠ Open a TikTok Live stream first:<br>
-      <code>tiktok.com/@username/live</code>
-    </div>
-
-    <div class="progress-section">
-      <div class="progress-labels">
-        <span>CLICKS</span>
-        <span id="count-label">0 / 5000</span>
+    <section class="count-wrap">
+      <div class="count-row">
+        <span id="count">0</span>
+        <span class="of" id="of">of 5,000</span>
       </div>
-      <div class="progress-track">
-        <div class="progress-fill" id="progress-fill"></div>
+      <div class="track"><div class="fill" id="fill"></div></div>
+    </section>
+
+    <section class="group">
+      <label class="label" for="target">Target clicks</label>
+      <div class="stepper">
+        <button type="button" id="minus" aria-label="Decrease target">−</button>
+        <input id="target" type="number" min="1" max="1000000" step="1" value="5000" inputmode="numeric" />
+        <button type="button" id="plus" aria-label="Increase target">+</button>
       </div>
+      <div class="chips" id="chips">
+        <button class="chip" data-v="100">100</button>
+        <button class="chip" data-v="500">500</button>
+        <button class="chip" data-v="1000">1k</button>
+        <button class="chip" data-v="5000">5k</button>
+      </div>
+    </section>
+
+    <div class="loop" id="loop-row">
+      <div>
+        <div class="loop-title">Repeat</div>
+        <div class="loop-sub">Start over once the target is reached</div>
+      </div>
+      <button class="switch" id="loop" role="switch" aria-checked="false" aria-label="Repeat when target is reached"></button>
     </div>
 
-    <div class="toggle-wrap disabled" id="toggle-wrap">
-      <span class="toggle-label" id="toggle-label">START CLICKER</span>
-      <div class="toggle-switch" id="toggle-switch">
-        <div class="toggle-knob"></div>
-      </div>
-    </div>
+    <button id="main-btn" disabled><span id="main-label">Start</span></button>
 
-    <div class="stats">
-      <div class="stat-box">
-        <div class="stat-val highlight" id="stat-clicks">0</div>
-        <div class="stat-label">Clicks</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val" id="stat-remaining">5000</div>
-        <div class="stat-label">Remaining</div>
-      </div>
-    </div>
-
-    <div class="footer">
-      Only works on TikTok <strong>/@username/live</strong>
-    </div>
-
-  </div>
+  </main>
   <script src="popup.js"></script>
 </body>
 </html>
